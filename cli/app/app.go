@@ -39,7 +39,9 @@ func WithProject(factory ProjectFactory, action ProjectAction) func(context *cli
 		if err != nil {
 			logrus.Fatalf("Failed to read project: %v", err)
 		}
+		pre_plugin(p, context)
 		action(p, context)
+		post_plugin(p, context)
 	}
 }
 
