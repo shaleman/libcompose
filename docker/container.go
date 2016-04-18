@@ -528,6 +528,9 @@ func (c *Container) createContainer(imageName, oldContainer string, configOverri
 		}
 		configWrapper.HostConfig.Binds = util.Merge(configWrapper.HostConfig.Binds, volumeBinds(configWrapper.Config.Volumes, &info))
 	}
+	if configWrapper.Config.Hostname == "" {
+		configWrapper.Config.Hostname = c.name
+	}
 
 	logrus.Debugf("Creating container %s %#v", c.name, configWrapper)
 
