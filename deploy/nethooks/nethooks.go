@@ -3,6 +3,7 @@ package nethooks
 import (
 	"errors"
 	"os"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libcompose/deploy/ops"
 	"github.com/docker/libcompose/project"
@@ -10,7 +11,7 @@ import (
 )
 
 const (
-	netmasterBaseURL = "http://netmaster:9999"
+	netmasterBaseURL           = "http://netmaster:9999"
 	applyLinksBasedPolicyFlag  = true
 	applyLabelsBasedPolicyFlag = true
 	applyDefaultPolicyFlag     = false
@@ -35,6 +36,12 @@ func CreateNetConfig(p *project.Project) error {
 		if err := applyLinksBasedPolicy(p); err != nil {
 			return err
 		}
+		if err := createServiceLbs(p); err != nil {
+			return err
+		}
+		if err := populateSvcLinksEnv(p); err != nil {
+			return err
+		}
 		if err := clearSvcLinks(p); err != nil {
 			return err
 		}
@@ -46,7 +53,7 @@ func CreateNetConfig(p *project.Project) error {
 	return nil
 }
 
-// DeleteNetConfig removes network and policies in coniv-netmaster 
+// DeleteNetConfig removes network and policies in coniv-netmaster
 func DeleteNetConfig(p *project.Project) error {
 	log.Debugf("Delete network for the project '%s' ", p.Name)
 
@@ -91,6 +98,9 @@ func ScaleNetConfig(p *project.Project) error {
 	log.Debugf("Scale network for the project '%s' ", p.Name)
 
 	if applyLinksBasedPolicyFlag {
+		if err := populateSvcLinksEnv(p); err != nil {
+			return err
+		}
 		if err := clearSvcLinks(p); err != nil {
 			log.Errorf("Unable to clear service links. Error: %s", err)
 		}
@@ -132,7 +142,7 @@ func AutoGenParams(p *project.Project) error {
 	return nil
 }
 
-// Generate labels to tag the services 
+// Generate labels to tag the services
 func AutoGenLabels(p *project.Project) error {
 	for _, svcName := range p.Configs.Keys() {
 		svc, _ := p.Configs.Get(svcName)

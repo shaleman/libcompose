@@ -16,7 +16,7 @@
 		  "DefaultTenant": "default",
 		  "Networks": "test,dev",
 		  "DefaultNetwork": "dev",
-		  "NetworkPolicies" : "TrustApp,RedisDefault,WebDefault",
+		  "NetworkPolicies" : "TrustApp",
 		  "DefaultNetworkPolicy": "TrustApp" }
 	],
 

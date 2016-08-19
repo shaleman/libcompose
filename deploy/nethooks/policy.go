@@ -1,14 +1,15 @@
 package nethooks
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
 	contivClient "github.com/contiv/contivmodel/client"
 	"github.com/docker/go-connections/nat"
-	"github.com/docker/libcompose/deploy/ops"
 	"github.com/docker/libcompose/config"
+	"github.com/docker/libcompose/deploy/ops"
 	"github.com/docker/libcompose/project"
 	"github.com/docker/libcompose/yaml"
 )
@@ -89,7 +90,7 @@ func getNetworkNameFromProject(p *project.Project) string {
 
 func getFullSvcName(p *project.Project, svcName string) string {
 	tenantName := getTenantNameFromProject(p)
-	fullSvcName := p.Name + "-" + svcName 
+	fullSvcName := p.Name + "-" + svcName
 	if tenantName != TENANT_DEFAULT {
 		fullSvcName = fullSvcName + "/" + tenantName
 	}
@@ -138,6 +139,31 @@ func clearSvcLinks(p *project.Project) error {
 	return nil
 }
 
+// populateSvcLinksEnv populates env variables based on links
+func populateSvcLinksEnv(p *project.Project) error {
+	// walk thru each service
+	for _, svcName := range p.Configs.Keys() {
+		svc, _ := p.Configs.Get(svcName)
+		env := svc.Environment.Slice()
+
+		// walk thru all links under the service
+		for _, link := range svc.Links.Slice() {
+			name, alias := project.NameAlias(link)
+			toSvcName := getSvcName(p, name)
+			envName := strings.ToUpper(alias)
+			envVar := envName + "_NAME=" + toSvcName
+
+			// append an env variable for the alias
+			env = append(env, envVar)
+		}
+
+		log.Debugf("Setting env variables for svc %s. Env: %v", svcName, env)
+		svc.Environment = yaml.NewMaporEqualSlice(env)
+	}
+
+	return nil
+}
+
 func extractPort(ps string) string {
 	lastCol := strings.LastIndex(ps, ":")
 	if lastCol == -1 {
@@ -180,15 +206,15 @@ func clearExposedPorts(p *project.Project) error {
 
 func addDenyAllRule(tenantName, networkName, fromEpgName, policyName string, ruleID int) error {
 	rule := &contivClient.Rule{
-		Action:        "deny",
-		Direction:     "in",
+		Action:            "deny",
+		Direction:         "in",
 		FromEndpointGroup: fromEpgName,
 		FromNetwork:       networkName,
-		PolicyName:    policyName,
-		Priority:      ruleID,
-		Protocol:      "tcp",
-		RuleID:        getRuleStr(ruleID),
-		TenantName:    tenantName,
+		PolicyName:        policyName,
+		Priority:          ruleID,
+		Protocol:          "tcp",
+		RuleID:            getRuleStr(ruleID),
+		TenantName:        tenantName,
 	}
 	if err := cl.RulePost(rule); err != nil {
 		log.Errorf("Unable to create deny all rule %#v. Error: %v", rule, err)
@@ -200,16 +226,16 @@ func addDenyAllRule(tenantName, networkName, fromEpgName, policyName string, rul
 
 func addInAcceptRule(tenantName, networkName, fromEpgName, policyName, protoName string, portID, ruleID int) error {
 	rule := &contivClient.Rule{
-		Action:        "allow",
-		Direction:     "in",
+		Action:            "allow",
+		Direction:         "in",
 		FromEndpointGroup: fromEpgName,
 		FromNetwork:       networkName,
-		PolicyName:    policyName,
-		Port:          portID,
-		Priority:      ruleID,
-		Protocol:      protoName,
-		RuleID:        getRuleStr(ruleID),
-		TenantName:    tenantName,
+		PolicyName:        policyName,
+		Port:              portID,
+		Priority:          ruleID,
+		Protocol:          protoName,
+		RuleID:            getRuleStr(ruleID),
+		TenantName:        tenantName,
 	}
 	if err := cl.RulePost(rule); err != nil {
 		log.Errorf("Unable to create allow rule %#v. Error: %v", rule, err)
@@ -221,15 +247,15 @@ func addInAcceptRule(tenantName, networkName, fromEpgName, policyName, protoName
 
 func addOutAcceptAllRule(tenantName, networkName, fromEpgName, policyName string, ruleID int) error {
 	rule := &contivClient.Rule{
-		Action:        "allow",
-		Direction:     "out",
+		Action:          "allow",
+		Direction:       "out",
 		ToEndpointGroup: fromEpgName,
 		ToNetwork:       networkName,
-		PolicyName:    policyName,
-		Priority:      ruleID,
-		Protocol:      "tcp",
-		RuleID:        getRuleStr(ruleID),
-		TenantName:    tenantName,
+		PolicyName:      policyName,
+		Priority:        ruleID,
+		Protocol:        "tcp",
+		RuleID:          getRuleStr(ruleID),
+		TenantName:      tenantName,
 	}
 	if err := cl.RulePost(rule); err != nil {
 		log.Errorf("Unable to create allow rule %#v. Error: %v", rule, err)
@@ -257,7 +283,7 @@ func addApp(tenantName string, p *project.Project) error {
 	log.Debugf("Add App '%s':'%s' ", tenantName, p.Name)
 	app := &contivClient.AppProfile{
 		AppProfileName: p.Name,
-		TenantName: tenantName,
+		TenantName:     tenantName,
 	}
 
 	for _, svcName := range p.Configs.Keys() {
@@ -288,10 +314,10 @@ func deleteApp(tenantName string, p *project.Project) error {
 
 func addEpg(tenantName, networkName, epgName string, policies []string) error {
 	epg := &contivClient.EndpointGroup{
-		GroupName:       epgName,
-		NetworkName:     networkName,
-		Policies:        policies,
-		TenantName:      tenantName,
+		GroupName:   epgName,
+		NetworkName: networkName,
+		Policies:    policies,
+		TenantName:  tenantName,
 	}
 	if err := cl.EndpointGroupPost(epg); err != nil {
 		log.Errorf("Unable to create endpoint group. Tenant '%s' Network '%s' Epg '%s'. Error %v",
@@ -342,7 +368,7 @@ func applyDefaultPolicy(p *project.Project, polRecs map[string]policyCreateRec) 
 		}
 		policies = append(policies, policyName)
 
-		if err := addDenyAllRule(tenantName,"", "", policyName, ruleID); err != nil {
+		if err := addDenyAllRule(tenantName, "", "", policyName, ruleID); err != nil {
 			log.Errorf("Unable to add deny rule. Error %v ", err)
 			return err
 		}
@@ -354,7 +380,7 @@ func applyDefaultPolicy(p *project.Project, polRecs map[string]policyCreateRec) 
 			log.Errorf("Unable to add policy. Error %v", err)
 		}
 		policies = append(policies, policyName)
-		if err := addOutAcceptAllRule(tenantName,"", "", policyName, ruleID); err != nil {
+		if err := addOutAcceptAllRule(tenantName, "", "", policyName, ruleID); err != nil {
 			log.Errorf("Unable to add deny rule. Error %v ", err)
 			return err
 		}
@@ -399,14 +425,14 @@ func applyExposePolicy(p *project.Project, expMap map[string][]string, polRecs m
 			}
 			toEpgName := getSvcName(p, toSvcName)
 			policies = append(policies, policyName)
-			if err := addEpg(tenantName,networkName, toEpgName, policies); err != nil {
+			if err := addEpg(tenantName, networkName, toEpgName, policies); err != nil {
 				log.Errorf("Unable to add epg. Error %v", err)
 				return err
 			}
 		}
 
 		if len(spList) > 0 {
-			if err := addDenyAllRule(tenantName, "" , "", policyName, ruleID); err != nil {
+			if err := addDenyAllRule(tenantName, "", "", policyName, ruleID); err != nil {
 				return err
 			}
 			log.Debugf("Exposed %v : add implicit deny ", policyName)
@@ -419,7 +445,7 @@ func applyExposePolicy(p *project.Project, expMap map[string][]string, polRecs m
 				log.Errorf("Unable to get port number. Error %v ", err)
 			}
 
-			if err = addInAcceptRule(tenantName,"", "", policyName, "tcp", pNum, ruleID); err != nil {
+			if err = addInAcceptRule(tenantName, "", "", policyName, "tcp", pNum, ruleID); err != nil {
 				log.Errorf("Unable to add allow rule. Error %v ", err)
 				return err
 			} else {
@@ -508,7 +534,7 @@ func getServicePorts(svcName string, svc *config.ServiceConfig) ([]nat.Port, err
 }
 
 func applyInPolicy(p *project.Project, fromSvcName, toSvcName string, polRecs map[string]policyCreateRec) error {
-	svc,_ := p.Configs.Get(toSvcName)
+	svc, _ := p.Configs.Get(toSvcName)
 
 	policyRec := getPolicyRec(toSvcName, polRecs)
 	tenantName := getTenantNameFromProject(p)
@@ -541,14 +567,14 @@ func applyInPolicy(p *project.Project, fromSvcName, toSvcName string, polRecs ma
 	}
 	policies = append(policies, policyName)
 
-	if err := addDenyAllRule(tenantName, "" , "", policyName, ruleID); err != nil {
+	if err := addDenyAllRule(tenantName, "", "", policyName, ruleID); err != nil {
 		return err
 	}
 	ruleID++
 
 	for _, natPort := range natPorts {
 		pNum, _ := strconv.Atoi(natPort.Port())
-		if err := addInAcceptRule(tenantName,"",fromEpgName, policyName, natPort.Proto(), pNum, ruleID); err != nil {
+		if err := addInAcceptRule(tenantName, "", fromEpgName, policyName, natPort.Proto(), pNum, ruleID); err != nil {
 			log.Errorf("Unable to add allow rule. Error %v ", err)
 			return err
 		}
@@ -588,6 +614,84 @@ func removeEpg(p *project.Project, svcName string) error {
 
 	if err := cl.EndpointGroupDelete(tenantName, epgName); err != nil {
 		log.Debugf("Unable to delete '%s' epg. Error: %v", epgName, err)
+	}
+
+	return nil
+}
+
+// create one service instance
+func addServiceLb(tenantName, networkName, serviceName string, ports, selectors []string) error {
+	serviceLB := &contivClient.ServiceLB{
+		TenantName:  tenantName,
+		NetworkName: networkName,
+		ServiceName: serviceName,
+		Ports:       ports,
+		Selectors:   selectors,
+	}
+
+	log.Debugf("Creating serviceLB: %+v", serviceLB)
+
+	if err := cl.ServiceLBPost(serviceLB); err != nil {
+		log.Errorf("Unable to create serviceLB. Tenant '%s' Network '%s' service '%s'. Error %v",
+			tenantName, networkName, serviceName, err)
+		return err
+	}
+
+	return nil
+}
+
+// creates a contiv serviceLB for each service
+func createServiceLbs(p *project.Project) error {
+	log.Debugf("Creating service load balancers..")
+	// get mapped ports for service
+	svcPortMap, err := getSvcPorts(p)
+	if err != nil {
+		log.Debugf("Unable to find exposed ports from service chains. Error %v", err)
+		return nil
+	}
+
+	tenantName := getTenantNameFromProject(p)
+
+	// walk all services
+	for _, svcName := range p.Configs.Keys() {
+		svc, _ := p.Configs.Get(svcName)
+		networkName := getNetworkName(svc)
+		portList := []string{}
+		svcPorts, ok := svcPortMap[svcName]
+		if ok {
+			for _, port := range svcPorts {
+				plist := strings.Split(strings.Split(port, "/")[0], ":")
+				proto := strings.Split(port, "/")[1]
+				portStr := fmt.Sprintf("%s:%s:%s", plist[0], plist[0], strings.ToUpper(proto))
+				portList = append(portList, portStr)
+			}
+		}
+
+		serviceLbName := fmt.Sprintf("%s-svc", getSvcName(p, svcName))
+		log.Infof("Creating service loadbalancer for: %s", serviceLbName)
+
+		// extract exposed ports from image
+		exposedPorts, err := getServicePorts(svcName, svc)
+		if err != nil {
+			return err
+		}
+		for _, nPort := range exposedPorts {
+			plist := strings.Split(strings.Split(string(nPort), "/")[0], ":")
+			proto := strings.Split(string(nPort), "/")[1]
+			portStr := fmt.Sprintf("%s:%s:%s", plist[0], plist[0], strings.ToUpper(proto))
+			portList = append(portList, portStr)
+		}
+
+		selectors := []string{
+			fmt.Sprintf("com.docker.compose.project=%s", p.Name),
+			fmt.Sprintf("com.docker.compose.service=%s", svcName),
+		}
+
+		// create a serviceLB
+		err = addServiceLb(tenantName, networkName, serviceLbName, portList, selectors)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

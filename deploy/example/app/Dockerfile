@@ -5,4 +5,5 @@ RUN apt-get update &&\
 CMD python app.py
 COPY . /pycode
 WORKDIR /pycode
+EXPOSE 8000 5001
 RUN pip install -r requirements.txt
