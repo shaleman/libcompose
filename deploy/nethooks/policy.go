@@ -155,6 +155,11 @@ func populateSvcLinksEnv(p *project.Project) error {
 
 			// append an env variable for the alias
 			env = append(env, envVar)
+
+			// add another env variable for serviceLB
+			envVar = envName + "_SVC_NAME=" + toSvcName + "-svc"
+			env = append(env, envVar)
+
 		}
 
 		log.Debugf("Setting env variables for svc %s. Env: %v", svcName, env)

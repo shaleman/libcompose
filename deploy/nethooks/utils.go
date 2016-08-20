@@ -6,9 +6,9 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/docker/go-connections/nat"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/client"
+	"github.com/docker/go-connections/nat"
 	"golang.org/x/net/context"
 )
 
@@ -40,7 +40,7 @@ func initDockerClient() error {
 func getImageInfo(imageName string) ([]nat.Port, error) {
 	imageInfoList := []nat.Port{}
 
-	if err := initDockerClient(); err !=nil {
+	if err := initDockerClient(); err != nil {
 		log.Errorf("Unable to connect to docker: %s", err)
 		return imageInfoList, err
 	}
@@ -54,7 +54,7 @@ func getImageInfo(imageName string) ([]nat.Port, error) {
 	}
 
 	for port := range imageInfo.ContainerConfig.ExposedPorts {
-		log.Infof("  Fetched port/protocol) = %s/%s from image", port.Proto(), port.Port())
+		log.Debugf("  Fetched port/protocol) = %s/%s from image", port.Proto(), port.Port())
 		imageInfoList = append(imageInfoList, port)
 	}
 
@@ -76,7 +76,7 @@ func getDnsInfo(targetNetwork, tenant string) (string, error) {
 	if tenant != TENANT_DEFAULT {
 		targetNetwork = targetNetwork + "/" + tenant
 	}
-	if err := initDockerClient(); err !=nil {
+	if err := initDockerClient(); err != nil {
 		log.Errorf("Unable to connect to docker: %s", err)
 		return "", err
 	}
@@ -88,7 +88,7 @@ func getDnsInfo(targetNetwork, tenant string) (string, error) {
 		return "", err
 	}
 
-	if len (containerInfo.NetworkSettings.Networks) == 0 {
+	if len(containerInfo.NetworkSettings.Networks) == 0 {
 		return "", errors.New("No endpoints found; Are Networks Configured?")
 	}
 
